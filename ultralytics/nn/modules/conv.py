@@ -680,7 +680,7 @@ class CBAM1(nn.Module):
         spatial_attention (SpatialAttention): Spatial attention module.
     """
 
-    def __init__(self, c1, kernel_size=7):
+    def __init__(self, c1, c2=None, kernel_size=7):
         """Initialize CBAM with given parameters.
 
         Args:
