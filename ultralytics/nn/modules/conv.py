@@ -24,6 +24,7 @@ __all__ = (
     "LightConv",
     "RepConv",
     "SpatialAttention",
+    "CBAM1",
 )
 
 
