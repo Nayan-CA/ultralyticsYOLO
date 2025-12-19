@@ -103,6 +103,12 @@ from .transformer import (
     TransformerLayer,
 )
 
+from .cbam import (
+    ChannelAttention1,
+    SpatialAttention1,
+    CBAM2,
+)
+
 __all__ = (
     "AIFI",
     "C1",
@@ -180,4 +186,7 @@ __all__ = (
     "YOLOEDetect",
     "YOLOESegment",
     "v10Detect",
+    "ChannelAttention1",
+    "SpatialAttention1",
+    "CBAM2",
 )
