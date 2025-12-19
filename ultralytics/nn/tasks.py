@@ -1646,6 +1646,9 @@ def parse_model(d, ch, verbose=True):
             c2 = args[0]
             c1 = ch[f]
             args = [*args[1:]]
+        elif m is CBAM2:
+            c2 = ch[f]        # output channels SAME as input
+            args = [c2, *args]
         else:
             c2 = ch[f]
 
