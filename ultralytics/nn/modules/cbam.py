@@ -37,8 +37,8 @@ class SpatialAttention1(nn.Module):
 class CBAM2(nn.Module):
     def __init__(self, in_channels, reduction=16, kernel_size=7):
         super(CBAM2, self).__init__()
-        self.channel_attention = ChannelAttention(in_channels, reduction)
-        self.spatial_attention = SpatialAttention(kernel_size)
+        self.channel_attention = ChannelAttention1(in_channels, reduction)
+        self.spatial_attention = SpatialAttention1(kernel_size)
 
     def forward(self, x):
         # Apply channel attention
