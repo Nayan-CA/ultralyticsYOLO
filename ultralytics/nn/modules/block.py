@@ -52,7 +52,6 @@ __all__ = (
     "ResNetLayer",
     "SCDown",
     "TorchVision",
-    "CBAM1",
 )
 
 
