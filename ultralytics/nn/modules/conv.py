@@ -24,7 +24,6 @@ __all__ = (
     "LightConv",
     "RepConv",
     "SpatialAttention",
-    "CBAM1",
 )
 
 
@@ -703,52 +702,52 @@ class Index(nn.Module):
 #         return self.spatial_attention(self.channel_attention(x))
 
 
-class CBAM1(nn.Module):
-    """Convolutional Block Attention Module."""
+# class CBAM1(nn.Module):
+#     """Convolutional Block Attention Module."""
     
-    def __init__(self, *args, **kwargs):
-        """Initialize CBAM with debugging."""
-        super().__init__()
+#     def __init__(self, *args, **kwargs):
+#         """Initialize CBAM with debugging."""
+#         super().__init__()
         
-        # Print everything we receive
-        print("="*70)
-        print("CBAM1 __init__ called!")
-        print(f"Positional args (*args): {args}")
-        print(f"  - Number of args: {len(args)}")
-        for i, arg in enumerate(args):
-            print(f"  - args[{i}] = {arg} (type: {type(arg).__name__})")
-        print(f"Keyword args (**kwargs): {kwargs}")
-        print("="*70)
+#         # Print everything we receive
+#         print("="*70)
+#         print("CBAM1 __init__ called!")
+#         print(f"Positional args (*args): {args}")
+#         print(f"  - Number of args: {len(args)}")
+#         for i, arg in enumerate(args):
+#             print(f"  - args[{i}] = {arg} (type: {type(arg).__name__})")
+#         print(f"Keyword args (**kwargs): {kwargs}")
+#         print("="*70)
         
-        # Try to extract parameters safely
-        c1 = args[0] if len(args) > 0 else None
-        c2 = args[1] if len(args) > 1 else None
-        kernel_size = args[2] if len(args) > 2 else kwargs.get('kernel_size', 7)
+#         # Try to extract parameters safely
+#         c1 = args[0] if len(args) > 0 else None
+#         c2 = args[1] if len(args) > 1 else None
+#         kernel_size = args[2] if len(args) > 2 else kwargs.get('kernel_size', 7)
         
-        print(f"Extracted values:")
-        print(f"  - c1 = {c1}")
-        print(f"  - c2 = {c2}")
-        print(f"  - kernel_size = {kernel_size}")
-        print("="*70)
+#         print(f"Extracted values:")
+#         print(f"  - c1 = {c1}")
+#         print(f"  - c2 = {c2}")
+#         print(f"  - kernel_size = {kernel_size}")
+#         print("="*70)
         
-        # Now create the modules
-        self.channel_attention = ChannelAttention(c1)
+#         # Now create the modules
+#         self.channel_attention = ChannelAttention(c1)
         
-        # Make sure kernel_size is valid
-        if kernel_size not in (3, 7):
-            print(f"❌ ERROR: Invalid kernel_size = {kernel_size}")
-            print(f"   Expected 3 or 7, but got {kernel_size} (type: {type(kernel_size)})")
-            # Try to fix it
-            if isinstance(kernel_size, (list, tuple)):
-                kernel_size = kernel_size[0] if kernel_size else 7
-            else:
-                kernel_size = 7
-            print(f"   Using default kernel_size = {kernel_size}")
+#         # Make sure kernel_size is valid
+#         if kernel_size not in (3, 7):
+#             print(f"❌ ERROR: Invalid kernel_size = {kernel_size}")
+#             print(f"   Expected 3 or 7, but got {kernel_size} (type: {type(kernel_size)})")
+#             # Try to fix it
+#             if isinstance(kernel_size, (list, tuple)):
+#                 kernel_size = kernel_size[0] if kernel_size else 7
+#             else:
+#                 kernel_size = 7
+#             print(f"   Using default kernel_size = {kernel_size}")
         
-        self.spatial_attention = SpatialAttention(kernel_size)
-        print(f"✅ CBAM1 initialized successfully with kernel_size={kernel_size}")
-        print("="*70 + "\n")
+#         self.spatial_attention = SpatialAttention(kernel_size)
+#         print(f"✅ CBAM1 initialized successfully with kernel_size={kernel_size}")
+#         print("="*70 + "\n")
     
-    def forward(self, x):
-        """Apply channel and spatial attention sequentially."""
-        return self.spatial_attention(self.channel_attention(x))
+#     def forward(self, x):
+#         """Apply channel and spatial attention sequentially."""
+#         return self.spatial_attention(self.channel_attention(x))
