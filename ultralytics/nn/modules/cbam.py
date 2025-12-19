@@ -34,7 +34,7 @@ class SpatialAttention1(nn.Module):
         x = self.conv(x)
         return self.sigmoid(x)
 
-class CBAM1(nn.Module):
+class CBAM2(nn.Module):
     def __init__(self, in_channels, reduction=16, kernel_size=7):
         super(CBAM, self).__init__()
         self.channel_attention = ChannelAttention(in_channels, reduction)
