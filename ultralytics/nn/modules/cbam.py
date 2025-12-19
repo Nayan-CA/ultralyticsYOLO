@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 class ChannelAttention1(nn.Module):
     def __init__(self, in_channels, reduction=16):
-        super(ChannelAttention, self).__init__()
+        super(ChannelAttention1, self).__init__()
         self.avg_pool = nn.AdaptiveAvgPool2d(1)
         self.max_pool = nn.AdaptiveMaxPool2d(1)
         
@@ -23,7 +23,7 @@ class ChannelAttention1(nn.Module):
 
 class SpatialAttention1(nn.Module):
     def __init__(self, kernel_size=7):
-        super(SpatialAttention, self).__init__()
+        super(SpatialAttention1, self).__init__()
         self.conv = nn.Conv2d(2, 1, kernel_size, padding=kernel_size//2, bias=False)
         self.sigmoid = nn.Sigmoid()
 
@@ -36,7 +36,7 @@ class SpatialAttention1(nn.Module):
 
 class CBAM2(nn.Module):
     def __init__(self, in_channels, reduction=16, kernel_size=7):
-        super(CBAM, self).__init__()
+        super(CBAM2, self).__init__()
         self.channel_attention = ChannelAttention(in_channels, reduction)
         self.spatial_attention = SpatialAttention(kernel_size)
 
