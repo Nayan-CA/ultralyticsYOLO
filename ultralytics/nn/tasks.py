@@ -1651,6 +1651,12 @@ def parse_model(d, ch, verbose=True):
         elif m is CBAM2:
             c2 = ch[f]        # output channels SAME as input
             args = [c2, *args]
+        elif m is SimAM:
+            c2 = ch[f]        # SimAM is parameter-free, no channel change
+            # args stay empty []
+        elif m is ECA:
+            c2 = ch[f]        # ECA preserves channels
+            args = [c2, *args]  # pass channels as first arg
         else:
             c2 = ch[f]
 
