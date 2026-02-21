@@ -108,6 +108,11 @@ from .cbam import (
     CBAM2,
 )
 
+from .attention import (
+    SimAM,
+    ECA,
+)
+
 __all__ = (
     "AIFI",
     "C1",
@@ -188,4 +193,6 @@ __all__ = (
     "ChannelAttention1",
     "SpatialAttention1",
     "CBAM2",
+    "ECA",
+    "SimAM",
 )
