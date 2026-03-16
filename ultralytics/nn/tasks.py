@@ -73,6 +73,7 @@ from ultralytics.nn.modules import (
     SpatialAttention1,
     SimAM,
     ECA,
+    ConvNeXtBackbone,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
@@ -1657,6 +1658,19 @@ def parse_model(d, ch, verbose=True):
         elif m is ECA:
             c2 = ch[f]        # ECA preserves channels
             args = [c2, *args]  # pass channels as first arg
+        elif m is ConvNeXtBackbone:
+            m_ = m(*args)  # instantiate backbone
+            c2 = m_.out_channels  # list: [192, 384, 768]
+            m_.i, m_.f, m_.type = i, f, str(m)[8:-2].replace("__main__.", "")
+            m_.np = sum(x.numel() for x in m_.parameters())
+            if verbose:
+                LOGGER.info(f"{i:>3}{f!s:>20}{1:>3}{m_.np:10.0f}  {m_.type:<45}{args!s:<30}")
+            save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)
+            layers.append(m_)
+            if i == 0:
+                ch = []
+            ch.append(c2)  # c2 is a list here, Index layers will pick from it
+            continue  # skip the generic m_ constructio
         else:
             c2 = ch[f]
 
