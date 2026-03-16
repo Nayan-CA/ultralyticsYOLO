@@ -1654,9 +1654,10 @@ def parse_model(d, ch, verbose=True):
             if isinstance(c1, list):
                 # ConvNeXtBackbone returns a list of channel counts
                 c2 = c1[args[0]]  # pick the channel count at this index
+                args = [args[0]]  # ← KEEP the index in args so Index(index=0/1/2) is correct
             else:
                 c2 = args[0]
-            args = [*args[1:]]
+                args = [*args[1:]]
         elif m is CBAM2:
             c2 = ch[f]        # output channels SAME as input
             args = [c2, *args]
