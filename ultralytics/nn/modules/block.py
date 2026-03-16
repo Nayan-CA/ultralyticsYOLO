@@ -52,6 +52,7 @@ __all__ = (
     "ResNetLayer",
     "SCDown",
     "TorchVision",
+    "ConvNeXtBackbone",
 )
 
 
@@ -1943,3 +1944,37 @@ class SAVPE(nn.Module):
         aggregated = score.transpose(-2, -3) @ x.reshape(B, self.c, C // self.c, -1).transpose(-1, -2)
 
         return F.normalize(aggregated.transpose(-2, -3).reshape(B, Q, -1), dim=-1, p=2)
+
+
+
+# ultralytics/nn/modules/block.py  (add at bottom)
+
+import torchvision.models as tvm
+
+class ConvNeXtBackbone(nn.Module):
+    """
+    ConvNeXt-Tiny backbone that returns multi-scale feature maps
+    for P3 (stride 8), P4 (stride 16), P5 (stride 32).
+    """
+    def __init__(self, pretrained=True):
+        super().__init__()
+        weights = tvm.ConvNeXt_Tiny_Weights.DEFAULT if pretrained else None
+        base = tvm.convnext_tiny(weights=weights)
+
+        # Stage outputs:  96 → 192 → 384 → 768 channels
+        self.stem   = base.features[0]   # stride 4,  96ch
+        self.stage1 = base.features[1]   # stride 4,  96ch
+        self.stage2 = base.features[2:4] # stride 8,  192ch  ← P3
+        self.stage3 = base.features[4:6] # stride 16, 384ch  ← P4
+        self.stage4 = base.features[6:]  # stride 32, 768ch  ← P5
+
+        # Channel dims the neck expects
+        self.out_channels = [192, 384, 768]
+
+    def forward(self, x):
+        x = self.stem(x)
+        x = self.stage1(x)
+        p3 = self.stage2(x)    # 192 ch, 1/8
+        p4 = self.stage3(p3)   # 384 ch, 1/16
+        p5 = self.stage4(p4)   # 768 ch, 1/32
+        return [p3, p4, p5]    # list — neck picks these up via Index layers
