@@ -1,8 +1,7 @@
 # YOLOv10s with ConvNeXtBackbone
 nc: 80
 
-scales:
-  s: [0.33, 0.50, 1024]
+# NO scales section — ConvNeXtBackbone has fixed pretrained channels
 
 backbone:
   - [-1, 1, ConvNeXtBackbone, [True]]   # 0 — outputs list [192ch, 384ch, 768ch]
@@ -12,19 +11,19 @@ backbone:
 
 head:
   - [3,  1, nn.Upsample, [None, 2, 'nearest']]   # 4 — upsample p5
-  - [[4, 2], 1, Concat, [1]]                      # 5 — concat p5_up + p4 → 768+384=1152ch
-  - [-1, 3, C2f, [384]]                           # 6 — 384ch
+  - [[4, 2], 1, Concat, [1]]                      # 5 — 768+384=1152ch
+  - [-1, 1, C2f, [384]]                           # 6 — 384ch  (n=1, no depth scaling)
 
   - [-1, 1, nn.Upsample, [None, 2, 'nearest']]   # 7 — upsample
-  - [[7, 1], 1, Concat, [1]]                      # 8 — concat + p3 → 384+192=576ch
-  - [-1, 3, C2f, [192]]                           # 9 ← P3 output 192ch
+  - [[7, 1], 1, Concat, [1]]                      # 8 — 384+192=576ch
+  - [-1, 1, C2f, [192]]                           # 9 ← P3 output 192ch
 
   - [-1, 1, Conv, [192, 3, 2]]                    # 10 — downsample
-  - [[10, 6], 1, Concat, [1]]                     # 11 — concat → 192+384=576ch
-  - [-1, 3, C2f, [384]]                           # 12 ← P4 output 384ch
+  - [[10, 6], 1, Concat, [1]]                     # 11 — 192+384=576ch
+  - [-1, 1, C2f, [384]]                           # 12 ← P4 output 384ch
 
   - [-1, 1, Conv, [384, 3, 2]]                    # 13 — downsample
-  - [[13, 3], 1, Concat, [1]]                     # 14 — concat → 384+768=1152ch
-  - [-1, 3, C2f, [768]]                           # 15 ← P5 output 768ch
+  - [[13, 3], 1, Concat, [1]]                     # 14 — 384+768=1152ch
+  - [-1, 1, C2f, [768]]                           # 15 ← P5 output 768ch
 
   - [[9, 12, 15], 1, v10Detect, [nc]]             # 16 — detect
