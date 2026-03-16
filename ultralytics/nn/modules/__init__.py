@@ -59,6 +59,7 @@ from .block import (
     ResNetLayer,
     SCDown,
     TorchVision,
+    ConvNeXtBackbone,
 )
 from .conv import (
     CBAM,
@@ -195,4 +196,5 @@ __all__ = (
     "CBAM2",
     "ECA",
     "SimAM",
+    "ConvNeXtBackbone",
 )
