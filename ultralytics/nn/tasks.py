@@ -1645,9 +1645,17 @@ def parse_model(d, ch, verbose=True):
             args = [c1, c2, *args[1:]]
         elif m is CBFuse:
             c2 = ch[f[-1]]
+        # elif m in frozenset({TorchVision, Index}):
+        #     c2 = args[0]
+        #     c1 = ch[f]
+        #     args = [*args[1:]]
         elif m in frozenset({TorchVision, Index}):
-            c2 = args[0]
             c1 = ch[f]
+            if isinstance(c1, list):
+                # ConvNeXtBackbone returns a list of channel counts
+                c2 = c1[args[0]]  # pick the channel count at this index
+            else:
+                c2 = args[0]
             args = [*args[1:]]
         elif m is CBAM2:
             c2 = ch[f]        # output channels SAME as input
