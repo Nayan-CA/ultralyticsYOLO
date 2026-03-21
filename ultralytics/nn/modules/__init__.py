@@ -60,6 +60,7 @@ from .block import (
     SCDown,
     TorchVision,
     ConvNeXtBackbone,
+    C2f_CBAM,
 )
 from .conv import (
     CBAM,
@@ -197,4 +198,5 @@ __all__ = (
     "ECA",
     "SimAM",
     "ConvNeXtBackbone",
+    "C2f_CBAM",
 )
