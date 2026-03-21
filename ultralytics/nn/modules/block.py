@@ -53,6 +53,7 @@ __all__ = (
     "SCDown",
     "TorchVision",
     "ConvNeXtBackbone",
+    "C2f_CBAM"
 )
 
 
@@ -1971,10 +1972,21 @@ class ConvNeXtBackbone(nn.Module):
         # Channel dims the neck expects
         self.out_channels = [192, 384, 768]
 
-    def forward(self, x):
+    def forward(self, x):                        
         x = self.stem(x)
         x = self.stage1(x)
         p3 = self.stage2(x)    # 192 ch, 1/8
         p4 = self.stage3(p3)   # 384 ch, 1/16
         p5 = self.stage4(p4)   # 768 ch, 1/32
         return [p3, p4, p5]    # list — neck picks these up via Index layers
+
+class C2f_CBAM(nn.Module):
+    """C2f block with CBAM attention for improved feature extraction."""
+
+    def __init__(self, c1, c2, n=1, shortcut=False, g=1, e=0.5):
+        super().__init__()
+        self.c2f = C2f(c1, c2, n, shortcut, g, e)
+        self.cbam = CBAM2(c2)
+
+    def forward(self, x):
+        return self.cbam(self.c2f(x))
