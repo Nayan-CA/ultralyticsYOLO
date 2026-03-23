@@ -1,0 +1,98 @@
+# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+# YOLOv10s + Attention (ECA, CBAM2, SimAM) — SIPaKMeD Cervical Dataset (5 classes)
+#
+# Uses EXACT module names already registered in your tasks.py:
+#   ECA    -> elif m is ECA:   c2 = ch[f]; args = [c2, *args]
+#   CBAM2  -> elif m is CBAM2: c2 = ch[f]; args = [c2, *args]
+#   SimAM  -> elif m is SimAM: c2 = ch[f]; args = []
+#   PSA    -> already in base_modules (original, kept at P5)
+#
+# Attention placement rationale:
+#   ECA   @ backbone layers 5, 8   — lightweight channel attention after P3/P4 C2f
+#                                     captures inter-channel texture cues for cell type
+#   CBAM2 @ neck layers 16, 20     — spatial + channel attention on P3/P4 neck outputs
+#                                     suppresses slide background, focuses on cell body
+#   SimAM @ layers 21, 25, 29      — parameter-free 3D attention before each detect input
+#                                     zero params = zero overfitting risk on 7800 images
+#
+# Layer index map (post-insertion):
+#   Backbone:
+#     0  Conv  64   P1/2
+#     1  Conv  128  P2/4
+#     2  C2f   128
+#     3  Conv  256  P3/8
+#     4  C2f   256
+#     5  ECA   256       <- channel attention after P3 stage
+#     6  SCDown 512 P4/16
+#     7  C2f   512
+#     8  ECA   512       <- channel attention after P4 stage
+#     9  SCDown 1024 P5/32
+#    10  C2fCIB 1024
+#    11  SPPF  1024
+#    12  PSA   1024      <- global self-attention at P5 (original, kept)
+#
+#   Head:
+#    13  Upsample
+#    14  Concat [13, 8]  <- cat ECA-refined P4
+#    15  C2f   512
+#    16  CBAM2 512       <- spatial+channel on P4 neck output
+#    17  Upsample
+#    18  Concat [17, 5]  <- cat ECA-refined P3
+#    19  C2f   256
+#    20  CBAM2 256       <- spatial+channel on P3 neck output (P3/8-small)
+#    21  SimAM []        <- parameter-free refinement before P3 detect
+#    22  Conv  256 3 2
+#    23  Concat [22, 16] <- cat CBAM2-refined P4
+#    24  C2f   512       (P4/16-medium)
+#    25  SimAM []        <- parameter-free refinement before P4 detect
+#    26  SCDown 512 3 2
+#    27  Concat [26, 12] <- cat PSA output P5
+#    28  C2fCIB 1024     (P5/32-large)
+#    29  SimAM []        <- parameter-free refinement before P5 detect
+#    30  v10Detect [21, 25, 29]
+
+# Parameters
+nc: 5  # SIPaKMeD classes: Parabasal, Superficial-Intermediate, Koilocytotic, Dyskeratotic, Metaplastic
+scales:
+  # [depth, width, max_channels]
+  s: [0.33, 0.50, 1024]
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]]             # 0  P1/2
+  - [-1, 1, Conv, [128, 3, 2]]            # 1  P2/4
+  - [-1, 3, C2f, [128, True]]             # 2
+  - [-1, 1, Conv, [256, 3, 2]]            # 3  P3/8
+  - [-1, 6, C2f, [256, True]]             # 4
+  - [-1, 1, ECA, []]                      # 5  ECA after P3 — channels auto-filled by parse_model
+  - [-1, 1, SCDown, [512, 3, 2]]          # 6  P4/16
+  - [-1, 6, C2f, [512, True]]             # 7
+  - [-1, 1, ECA, []]                      # 8  ECA after P4 — channels auto-filled by parse_model
+  - [-1, 1, SCDown, [1024, 3, 2]]         # 9  P5/32
+  - [-1, 3, C2fCIB, [1024, True, True]]   # 10
+  - [-1, 1, SPPF, [1024, 5]]              # 11
+  - [-1, 1, PSA, [1024]]                  # 12 global self-attention at P5 (original kept)
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 13
+  - [[-1, 8], 1, Concat, [1]]                    # 14 cat ECA(P4) output — layer 8
+  - [-1, 3, C2f, [512]]                          # 15
+  - [-1, 1, CBAM2, []]                           # 16 CBAM2 on P4 neck — channels auto-filled
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 17
+  - [[-1, 5], 1, Concat, [1]]                    # 18 cat ECA(P3) output — layer 5
+  - [-1, 3, C2f, [256]]                          # 19
+  - [-1, 1, CBAM2, []]                           # 20 CBAM2 on P3 neck (P3/8-small) — channels auto-filled
+  - [-1, 1, SimAM, []]                           # 21 SimAM before P3 detect input
+
+  - [-1, 1, Conv, [256, 3, 2]]                   # 22
+  - [[-1, 16], 1, Concat, [1]]                   # 23 cat CBAM2(P4) output — layer 16
+  - [-1, 3, C2f, [512]]                          # 24 (P4/16-medium)
+  - [-1, 1, SimAM, []]                           # 25 SimAM before P4 detect input
+
+  - [-1, 1, SCDown, [512, 3, 2]]                 # 26
+  - [[-1, 12], 1, Concat, [1]]                   # 27 cat PSA output — layer 12
+  - [-1, 3, C2fCIB, [1024, True, True]]          # 28 (P5/32-large)
+  - [-1, 1, SimAM, []]                           # 29 SimAM before P5 detect input
+
+  - [[21, 25, 29], 1, v10Detect, [nc]]           # 30 Detect(P3-SimAM, P4-SimAM, P5-SimAM)
