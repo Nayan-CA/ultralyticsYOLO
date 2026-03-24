@@ -61,6 +61,7 @@ from .block import (
     TorchVision,
     ConvNeXtBackbone,
     C2f_CBAM,
+    MSCA,
 )
 from .conv import (
     CBAM,
@@ -199,4 +200,5 @@ __all__ = (
     "SimAM",
     "ConvNeXtBackbone",
     "C2f_CBAM",
+    "MSCA",
 )
