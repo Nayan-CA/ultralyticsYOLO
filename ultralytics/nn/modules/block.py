@@ -53,7 +53,8 @@ __all__ = (
     "SCDown",
     "TorchVision",
     "ConvNeXtBackbone",
-    "C2f_CBAM"
+    "C2f_CBAM",
+    "MSCA",
 )
 
 
@@ -2040,3 +2041,64 @@ class C2f_CBAM(nn.Module):
 
     def forward(self, x):
         return self.cbam(self.c2f(x))
+
+
+
+class MSCA(nn.Module):
+    """Multi-Scale Channel Attention.
+ 
+    Captures feature responses at three receptive field scales via
+    parallel dilated depthwise convolutions (dilation=1, 3, 5),
+    fuses them, then gates input features with sigmoid attention.
+ 
+    Designed for fine-grained cervical cell classification:
+      dilation=1 → dense chromatin texture  (Dyskeratotic)
+      dilation=3 → nuclear boundary detail  (Parabasal)
+      dilation=5 → perinuclear halo region  (Koilocytotic)
+ 
+    Args:
+        channels (int): Number of input/output channels (auto-filled by parse_model).
+        reduction (int): Channel reduction ratio for shared projection. Default 4.
+ 
+    Shape:
+        Input/Output: (B, C, H, W) — pass-through shape, attention gating only.
+    """
+ 
+    def __init__(self, channels, reduction=4):
+        super().__init__()
+        mid = max(channels // reduction, 16)  # floor at 16 to avoid collapse on narrow layers
+ 
+        # Shared pointwise projection: C -> C//4
+        self.proj = nn.Sequential(
+            nn.Conv2d(channels, mid, kernel_size=1, bias=False),
+            nn.BatchNorm2d(mid),
+            nn.ReLU(inplace=True),
+        )
+ 
+        # Three parallel dilated depthwise convolutions
+        # groups=mid keeps params minimal (depthwise, not full conv)
+        self.d1 = nn.Conv2d(mid, mid, kernel_size=3, padding=1, dilation=1, groups=mid, bias=False)
+        self.d3 = nn.Conv2d(mid, mid, kernel_size=3, padding=3, dilation=3, groups=mid, bias=False)
+        self.d5 = nn.Conv2d(mid, mid, kernel_size=3, padding=5, dilation=5, groups=mid, bias=False)
+ 
+        # Separate BN for each branch
+        self.bn1 = nn.BatchNorm2d(mid)
+        self.bn3 = nn.BatchNorm2d(mid)
+        self.bn5 = nn.BatchNorm2d(mid)
+ 
+        # Fuse all 3 branches back to C channels
+        self.fuse = nn.Sequential(
+            nn.Conv2d(mid * 3, channels, kernel_size=1, bias=False),
+            nn.BatchNorm2d(channels),
+        )
+ 
+        self.sigmoid = nn.Sigmoid()
+ 
+    def forward(self, x):
+        y = self.proj(x)                                        # (B, mid, H, W)
+        y1 = torch.relu(self.bn1(self.d1(y)))                  # local
+        y3 = torch.relu(self.bn3(self.d3(y)))                  # mid-range
+        y5 = torch.relu(self.bn5(self.d5(y)))                  # coarse
+        attn = self.fuse(torch.cat([y1, y3, y5], dim=1))       # (B, C, H, W)
+        return x * self.sigmoid(attn)
+ 
