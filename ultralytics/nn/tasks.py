@@ -75,6 +75,7 @@ from ultralytics.nn.modules import (
     ECA,
     ConvNeXtBackbone,
     C2f_CBAM,
+    MSCA,
 )
 from ultralytics.utils import DEFAULT_CFG_DICT, LOGGER, YAML, colorstr, emojis
 from ultralytics.utils.checks import check_requirements, check_suffix, check_yaml
@@ -1670,6 +1671,9 @@ def parse_model(d, ch, verbose=True):
         elif m is ECA:
             c2 = ch[f]        # ECA preserves channels
             args = [c2, *args]  # pass channels as first arg
+        elif m is MSCA:           # <-- ADD HERE
+            c2 = ch[f]
+            args = [c2]
         elif m is ConvNeXtBackbone:
             m_ = m(*args)  # instantiate backbone
             c2 = m_.out_channels  # list: [192, 384, 768]
