@@ -1,0 +1,98 @@
+# Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
+# YOLOv10s + MSCA + CBAM2 + SimAM — SIPaKMeD Cervical Dataset (5 classes)
+#
+# Changes from yolov10s_attention_v2.yaml:
+#   ECA  (layers 5, 8) → MSCA (layers 5, 8)
+#   CBAM2 and SimAM placement unchanged
+#
+# Why MSCA over ECA here:
+#   ECA:  single global average pool → 1D conv over sorted channels
+#         good at: which channels matter
+#         blind to: spatial scale of the features
+#
+#   MSCA: parallel dilated depthwise convs at d=1, d=3, d=5
+#         good at: which channels matter AND at which spatial scale
+#         d=1 → fine nuclear chromatin texture (Dyskeratotic)
+#         d=3 → nuclear boundary / cell membrane (Parabasal)
+#         d=5 → perinuclear halo region (Koilocytotic)
+#
+# Full layer map:
+#   Backbone:
+#     0   Conv     64   P1/2
+#     1   Conv     128  P2/4
+#     2   C2f      128
+#     3   Conv     256  P3/8
+#     4   C2f      256
+#     5   MSCA     256  <- multi-scale channel attn after P3 stage
+#     6   SCDown   512  P4/16
+#     7   C2f      512
+#     8   MSCA     512  <- multi-scale channel attn after P4 stage
+#     9   SCDown   1024 P5/32
+#    10   C2fCIB   1024
+#    11   SPPF     1024
+#    12   PSA      1024 <- global self-attn at P5 (original, kept)
+#
+#   Head:
+#    13   Upsample
+#    14   Concat [13, 8]   <- cat MSCA(P4) output
+#    15   C2f      512
+#    16   CBAM2    512     <- spatial+channel on P4 neck output
+#    17   Upsample
+#    18   Concat [17, 5]   <- cat MSCA(P3) output
+#    19   C2f      256
+#    20   CBAM2    256     <- spatial+channel on P3 neck output
+#    21   SimAM    []      <- parameter-free refinement before P3 detect
+#    22   Conv     256 3 2
+#    23   Concat [22, 16]  <- cat CBAM2(P4)
+#    24   C2f      512     (P4/16-medium)
+#    25   SimAM    []      <- parameter-free refinement before P4 detect
+#    26   SCDown   512 3 2
+#    27   Concat [26, 12]  <- cat PSA(P5)
+#    28   C2fCIB   1024    (P5/32-large)
+#    29   SimAM    []      <- parameter-free refinement before P5 detect
+#    30   v10Detect [21, 25, 29]
+
+nc: 5  # Parabasal, Superficial-Intermediate, Koilocytotic, Dyskeratotic, Metaplastic
+scales:
+  # [depth, width, max_channels]
+  s: [0.33, 0.50, 1024]
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]]              # 0  P1/2
+  - [-1, 1, Conv, [128, 3, 2]]             # 1  P2/4
+  - [-1, 3, C2f, [128, True]]              # 2
+  - [-1, 1, Conv, [256, 3, 2]]             # 3  P3/8
+  - [-1, 6, C2f, [256, True]]              # 4
+  - [-1, 1, MSCA, []]                      # 5  MSCA after P3 — channels auto-filled
+  - [-1, 1, SCDown, [512, 3, 2]]           # 6  P4/16
+  - [-1, 6, C2f, [512, True]]              # 7
+  - [-1, 1, MSCA, []]                      # 8  MSCA after P4 — channels auto-filled
+  - [-1, 1, SCDown, [1024, 3, 2]]          # 9  P5/32
+  - [-1, 3, C2fCIB, [1024, True, True]]    # 10
+  - [-1, 1, SPPF, [1024, 5]]               # 11
+  - [-1, 1, PSA, [1024]]                   # 12
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 13
+  - [[-1, 8], 1, Concat, [1]]                    # 14 cat MSCA(P4) — layer 8
+  - [-1, 3, C2f, [512]]                          # 15
+  - [-1, 1, CBAM2, []]                           # 16 CBAM2 on P4 neck
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]   # 17
+  - [[-1, 5], 1, Concat, [1]]                    # 18 cat MSCA(P3) — layer 5
+  - [-1, 3, C2f, [256]]                          # 19
+  - [-1, 1, CBAM2, []]                           # 20 CBAM2 on P3 neck
+  - [-1, 1, SimAM, []]                           # 21 SimAM before P3 detect
+
+  - [-1, 1, Conv, [256, 3, 2]]                   # 22
+  - [[-1, 16], 1, Concat, [1]]                   # 23 cat CBAM2(P4) — layer 16
+  - [-1, 3, C2f, [512]]                          # 24 P4/16-medium
+  - [-1, 1, SimAM, []]                           # 25 SimAM before P4 detect
+
+  - [-1, 1, SCDown, [512, 3, 2]]                 # 26
+  - [[-1, 12], 1, Concat, [1]]                   # 27 cat PSA(P5) — layer 12
+  - [-1, 3, C2fCIB, [1024, True, True]]          # 28 P5/32-large
+  - [-1, 1, SimAM, []]                           # 29 SimAM before P5 detect
+
+  - [[21, 25, 29], 1, v10Detect, [nc]]           # 30 Detect(P3, P4, P5)
