@@ -8,7 +8,7 @@
 #   - v10Detect head: P3/P4/P5 with [128, 256, 512] channels
 
 nc: 5  # SIPaKMeD: Superficial, Intermediate, Dyskeratotic, Koilocytotic, Parabasal
-scale: s   # ← add this line
+scale: s   
 
 scales:
   # [depth, width, max_channels]
@@ -61,11 +61,11 @@ head:
 # cos_lr: True
 # warmup_epochs: 3
 # epochs: 300
-# close_mosaic: 50        ← was 20, extend mosaic for harder augmentation
-# label_smoothing: 0.15   ← slight increase for boundary classes
+# close_mosaic: 50        
+# label_smoothing: 0.15  
 #
 # Loss weights (MOST IMPORTANT lever):
-# cls: 3.0    ← push harder on Dyskeratotic/Koilocytotic separation
+# cls: 3.0  
 # box: 1.5
 # dfl: 1.0
 #
@@ -73,5 +73,5 @@ head:
 # hsv_h: 0.02
 # hsv_s: 0.8
 # hsv_v: 0.5
-# copy_paste: 0.3   ← paste minority class instances
-# mixup: 0.15       ← soft label mixing for boundary classes
+# copy_paste: 0.3 
+# mixup: 0.15      
