@@ -8,6 +8,7 @@
 #   - v10Detect head: P3/P4/P5 with [128, 256, 512] channels
 
 nc: 5  # SIPaKMeD: Superficial, Intermediate, Dyskeratotic, Koilocytotic, Parabasal
+scale: s   # ← add this line
 
 scales:
   # [depth, width, max_channels]
@@ -51,7 +52,7 @@ head:
   - [-1,    1, C2fCIB,      [1024, True, True]]     # 26 - P5 out
 
   # ── Detection ──────────────────────────────────────────
-  - [[20, 23, 26], 1, v10Detect, [nc, [128, 256, 512]]]  # 27 - P3/P4/P5
+- [[20, 23, 26], 1, v10Detect, [nc]]
 
 
 # ── Recommended training config ────────────────────────
