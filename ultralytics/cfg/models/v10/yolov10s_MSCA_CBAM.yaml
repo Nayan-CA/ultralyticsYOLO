@@ -38,24 +38,24 @@ backbone:
   # [from, repeats, module, args]
   
   # ── Stem: Initial feature extraction ──────────────────────────────────────────
-  - [-1, 1, Conv,    [64, 3, 2]]            # 0 - P1/2 (stride 2, 320→160)
-  - [-1, 1, Conv,    [128, 3, 2]]           # 1 - P2/4 (stride 4, 160→80)
+  - [-1, 1, Conv,    [64, 3, 2]]            # 0 - P1/2 (stride 2)
+  - [-1, 1, Conv,    [128, 3, 2]]           # 1 - P2/4 (stride 4)
   - [-1, 3, C2f,    [128, True]]            # 2 - Feature refinement
   
   # ── P3 Stage: Small object features (NO attention - pure features) ────────────
-  - [-1, 1, Conv,    [256, 3, 2]]           # 3 - P3/8 downsample (80→40)
+  - [-1, 1, Conv,    [256, 3, 2]]           # 3 - P3/8 downsample
   - [-1, 6, C2f,    [256, True]]            # 4 - P3 features → skip to neck
   # Note: No attention here - CBAM will be applied in neck for P3
   
   # ── P4 Stage: Medium object features + MSCA ───────────────────────────────────
-  - [-1, 1, SCDown,  [512, 3, 2]]           # 5 - P4/16 downsample (40→20)
+  - [-1, 1, SCDown,  [512, 3, 2]]           # 5 - P4/16 downsample
   - [-1, 6, C2f,    [512, True]]            # 6 - P4 feature extraction
   - [-1, 1, MSCA,   [512]]                  # 7 - ★ MSCA @ P4: Multi-scale context
   # MSCA at P4 captures medium-scale morphological patterns
   # Cervical cell nuclei and cytoplasm boundaries are best detected here
   
   # ── P5 Stage: Large object features + PSA ─────────────────────────────────────
-  - [-1, 1, SCDown,  [1024, 3, 2]]          # 8 - P5/32 downsample (20→10)
+  - [-1, 1, SCDown,  [1024, 3, 2]]          # 8 - P5/32 downsample
   - [-1, 3, C2fCIB, [1024, True, True]]     # 9 - P5 features with CIB
   - [-1, 1, SPPF,   [1024, 5]]              # 10 - Spatial Pyramid Pooling Fast
   - [-1, 1, PSA,    [1024]]                 # 11 - ★ PSA @ P5: Global context
@@ -67,23 +67,23 @@ backbone:
 # ═══════════════════════════════════════════════════════════════════════════════
 head:
   # ── Top-down FPN: High-level features flow to lower levels ────────────────────
-  - [-1,    1, nn.Upsample, [None, 2, "nearest"]]   # 12 - Upsample P5 (10→20)
+  - [-1,    1, nn.Upsample, [None, 2, "nearest"]]   # 12 - Upsample P5
   - [[-1, 7], 1, Concat,    [1]]                    # 13 - Concat with MSCA@P4 output (layer 7)
-  - [-1,    1, C2f,         [512, 1, 1]]            # 14 - P4 neck fusion
+  - [-1,    1, C2f,         [512, 1]]               # 14 - P4 neck fusion
   
-  - [-1,    1, nn.Upsample, [None, 2, "nearest"]]   # 15 - Upsample P4 (20→40)
+  - [-1,    1, nn.Upsample, [None, 2, "nearest"]]   # 15 - Upsample P4
   - [[-1, 4], 1, Concat,    [1]]                    # 16 - Concat with P3 backbone (layer 4)
-  - [-1,    1, C2f,         [256, 1, 1]]            # 17 - P3 neck fusion
-  - [-1,    1, CBAM2,       [256]]                  # 18 - ★ CBAM @ P3: Spatial precision
+  - [-1,    1, C2f,         [256, 1]]               # 17 - P3 neck fusion
+  - [-1,    1, CBAM2,       [128]]                  # 18 - ★ CBAM @ P3: Spatial precision
   # CBAM at P3 provides channel + spatial attention for small object detection
   # Critical for detecting small abnormal cells and fine-grained features
 
   # ── Bottom-up PAN: Low-level features flow back to higher levels ──────────────
-  - [-1,    1, Conv,        [256, 3, 2]]            # 19 - Downsample P3→P4 (40→20)
+  - [-1,    1, Conv,        [256, 3, 2]]            # 19 - Downsample P3→P4
   - [[-1, 14], 1, Concat,   [1]]                    # 20 - Concat with P4 neck (layer 14)
-  - [-1,    1, C2f,         [512, 1, 1]]            # 21 - P4 PAN output
+  - [-1,    1, C2f,         [512, 1]]               # 21 - P4 PAN output
   
-  - [-1,    1, SCDown,      [512, 3, 2]]            # 22 - Downsample P4→P5 (20→10)
+  - [-1,    1, SCDown,      [512, 3, 2]]            # 22 - Downsample P4→P5
   - [[-1, 11], 1, Concat,   [1]]                    # 23 - Concat with PSA output (layer 11)
   - [-1,    1, C2fCIB,      [1024, True, True]]     # 24 - P5 PAN output
 
@@ -108,9 +108,9 @@ head:
 # │ P5    │ Backbone  │ PSA       │ Global context aggregation                 │
 # └─────────────────────────────────────────────────────────────────────────────┘
 #
-# Layer Count: ~250 layers (similar to CBAM-only)
-# Parameters: ~7.6M (vs baseline 7.22M, +5.3% increase)
-# GFLOPs: ~22.0 (vs baseline 21.4, +2.8% increase)
+# Layer Count: ~246 layers
+# Parameters: ~7.5M (vs baseline 7.22M, +3.9% increase)
+# GFLOPs: ~21.8 (vs baseline 21.4, +1.9% increase)
 #
 # Comparison with Previous Architectures:
 # ┌──────────────────┬────────────┬────────────┬─────────────────────────────────┐
