@@ -1,0 +1,179 @@
+# Ultralytics AGPL-3.0 License
+# YOLOv10s — Scale-Specific Attention Architecture
+# Designed for SIPaKMeD cervical cell classification
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARCHITECTURE PHILOSOPHY:
+# ═══════════════════════════════════════════════════════════════════════════════
+# This architecture uses COMPLEMENTARY attention placement instead of parallel:
+#   - MSCA @ P4 (backbone): Multi-scale context for medium-sized cell structures
+#   - CBAM @ P3 (neck): Spatial precision for small object detection
+#   - PSA @ P5 (backbone top): Global context aggregation
+#
+# WHY THIS DESIGN?
+#   1. Previous CBAM+MSCA combined model underperformed (mAP50-95: 0.766)
+#   2. Individual models performed better (MSCA: 0.778, CBAM: 0.775)
+#   3. Problem: Attention overlap at same scales → feature over-refinement
+#   4. Solution: Scale-specific attention → each module handles different scales
+#
+# EXPECTED IMPROVEMENTS:
+#   - No attention redundancy (each scale gets ONE type of attention)
+#   - Cleaner gradient flow
+#   - Better scale-specific feature extraction
+#   - Target: mAP50-95 > 0.78
+# ═══════════════════════════════════════════════════════════════════════════════
+
+nc: 5  # SIPaKMeD classes: Dyskeratotic_Abnormal, Koilocytotic_Abnormal, 
+       #                   Metaplastic_Benign, Parabasal_Normal, Superficial-Intermediate_Normal
+scale: s   
+
+scales:
+  # [depth, width, max_channels]
+  s: [0.33, 0.50, 1024]
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BACKBONE: Feature Extraction with Strategic Attention
+# ═══════════════════════════════════════════════════════════════════════════════
+backbone:
+  # [from, repeats, module, args]
+  
+  # ── Stem: Initial feature extraction ──────────────────────────────────────────
+  - [-1, 1, Conv,    [64, 3, 2]]            # 0 - P1/2 (stride 2, 320→160)
+  - [-1, 1, Conv,    [128, 3, 2]]           # 1 - P2/4 (stride 4, 160→80)
+  - [-1, 3, C2f,    [128, True]]            # 2 - Feature refinement
+  
+  # ── P3 Stage: Small object features (NO attention - pure features) ────────────
+  - [-1, 1, Conv,    [256, 3, 2]]           # 3 - P3/8 downsample (80→40)
+  - [-1, 6, C2f,    [256, True]]            # 4 - P3 features → skip to neck
+  # Note: No attention here - CBAM will be applied in neck for P3
+  
+  # ── P4 Stage: Medium object features + MSCA ───────────────────────────────────
+  - [-1, 1, SCDown,  [512, 3, 2]]           # 5 - P4/16 downsample (40→20)
+  - [-1, 6, C2f,    [512, True]]            # 6 - P4 feature extraction
+  - [-1, 1, MSCA,   [512]]                  # 7 - ★ MSCA @ P4: Multi-scale context
+  # MSCA at P4 captures medium-scale morphological patterns
+  # Cervical cell nuclei and cytoplasm boundaries are best detected here
+  
+  # ── P5 Stage: Large object features + PSA ─────────────────────────────────────
+  - [-1, 1, SCDown,  [1024, 3, 2]]          # 8 - P5/32 downsample (20→10)
+  - [-1, 3, C2fCIB, [1024, True, True]]     # 9 - P5 features with CIB
+  - [-1, 1, SPPF,   [1024, 5]]              # 10 - Spatial Pyramid Pooling Fast
+  - [-1, 1, PSA,    [1024]]                 # 11 - ★ PSA @ P5: Global context
+  # PSA aggregates global context across the entire feature map
+  # Essential for understanding overall cell morphology patterns
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HEAD: Feature Pyramid Network + PAN with Scale-Specific Attention
+# ═══════════════════════════════════════════════════════════════════════════════
+head:
+  # ── Top-down FPN: High-level features flow to lower levels ────────────────────
+  - [-1,    1, nn.Upsample, [None, 2, "nearest"]]   # 12 - Upsample P5 (10→20)
+  - [[-1, 7], 1, Concat,    [1]]                    # 13 - Concat with MSCA@P4 output (layer 7)
+  - [-1,    1, C2f,         [512, 1, 1]]            # 14 - P4 neck fusion
+  
+  - [-1,    1, nn.Upsample, [None, 2, "nearest"]]   # 15 - Upsample P4 (20→40)
+  - [[-1, 4], 1, Concat,    [1]]                    # 16 - Concat with P3 backbone (layer 4)
+  - [-1,    1, C2f,         [256, 1, 1]]            # 17 - P3 neck fusion
+  - [-1,    1, CBAM2,       [256]]                  # 18 - ★ CBAM @ P3: Spatial precision
+  # CBAM at P3 provides channel + spatial attention for small object detection
+  # Critical for detecting small abnormal cells and fine-grained features
+
+  # ── Bottom-up PAN: Low-level features flow back to higher levels ──────────────
+  - [-1,    1, Conv,        [256, 3, 2]]            # 19 - Downsample P3→P4 (40→20)
+  - [[-1, 14], 1, Concat,   [1]]                    # 20 - Concat with P4 neck (layer 14)
+  - [-1,    1, C2f,         [512, 1, 1]]            # 21 - P4 PAN output
+  
+  - [-1,    1, SCDown,      [512, 3, 2]]            # 22 - Downsample P4→P5 (20→10)
+  - [[-1, 11], 1, Concat,   [1]]                    # 23 - Concat with PSA output (layer 11)
+  - [-1,    1, C2fCIB,      [1024, True, True]]     # 24 - P5 PAN output
+
+  # ── Detection Head ────────────────────────────────────────────────────────────
+  - [[18, 21, 24], 1, v10Detect, [nc]]              # 25 - Multi-scale detection
+  # Detection inputs:
+  #   - Layer 18: P3 with CBAM attention (small objects)
+  #   - Layer 21: P4 with MSCA-enhanced features (medium objects)  
+  #   - Layer 24: P5 with PSA global context (large objects)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ARCHITECTURE SUMMARY
+# ═══════════════════════════════════════════════════════════════════════════════
+# 
+# Attention Distribution:
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │ Scale │ Location  │ Attention │ Purpose                                    │
+# ├───────┼───────────┼───────────┼────────────────────────────────────────────┤
+# │ P3    │ Neck      │ CBAM      │ Spatial precision for small cells          │
+# │ P4    │ Backbone  │ MSCA      │ Multi-scale context for cell morphology    │
+# │ P5    │ Backbone  │ PSA       │ Global context aggregation                 │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Layer Count: ~250 layers (similar to CBAM-only)
+# Parameters: ~7.6M (vs baseline 7.22M, +5.3% increase)
+# GFLOPs: ~22.0 (vs baseline 21.4, +2.8% increase)
+#
+# Comparison with Previous Architectures:
+# ┌──────────────────┬────────────┬────────────┬─────────────────────────────────┐
+# │ Architecture     │ Attention  │ mAP50-95   │ Issue                           │
+# ├──────────────────┼────────────┼────────────┼─────────────────────────────────┤
+# │ Baseline         │ None       │ 0.756      │ No attention                    │
+# │ CBAM-only        │ Neck×2     │ 0.775      │ Good but limited to neck        │
+# │ MSCA-only        │ Backbone×2 │ 0.778      │ Best single-type                │
+# │ CBAM+MSCA (old)  │ Both×2     │ 0.766      │ Over-refinement, worse than both│
+# │ Scale-Specific   │ Strategic  │ ~0.78+     │ Expected improvement            │
+# └──────────────────┴────────────┴────────────┴─────────────────────────────────┘
+#
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# RECOMMENDED TRAINING CONFIGURATION
+# ═══════════════════════════════════════════════════════════════════════════════
+# 
+# Basic Training Command:
+# ```
+# yolo detect train \
+#   model=yolov10s_scale_specific.yaml \
+#   data=/kaggle/working/SpikaMed-1/data.yaml \
+#   epochs=150 \
+#   imgsz=640 \
+#   batch=16 \
+#   optimizer=AdamW \
+#   lr0=0.0005 \
+#   cos_lr=True \
+#   warmup_epochs=3 \
+#   close_mosaic=50 \
+#   pretrained=True
+# ```
+#
+# Hyperparameters:
+# ──────────────────────────────────────────────────────────────────
+# optimizer: AdamW          # Stable convergence with attention modules
+# lr0: 0.0005               # Lower LR for attention module stability
+# lrf: 0.01                 # Final LR = lr0 * lrf
+# cos_lr: True              # Cosine annealing schedule
+# warmup_epochs: 3          # Gradual warmup
+# momentum: 0.937           # SGD momentum (if using SGD)
+# weight_decay: 0.0005      # Regularization
+#
+# Augmentation (optimized for cervical cell images):
+# ──────────────────────────────────────────────────────────────────
+# hsv_h: 0.02               # Slight hue variation (staining differences)
+# hsv_s: 0.8                # Saturation variation (important for cells)
+# hsv_v: 0.5                # Value/brightness variation
+# degrees: 0.0              # No rotation (cells have orientation)
+# translate: 0.1            # Minor translation
+# scale: 0.5                # Scale augmentation
+# fliplr: 0.5               # Horizontal flip
+# flipud: 0.0               # No vertical flip
+# mosaic: 1.0               # Mosaic augmentation
+# mixup: 0.15               # MixUp augmentation
+# copy_paste: 0.3           # Copy-paste augmentation
+#
+# Loss Weights (CRITICAL for medical imaging):
+# ──────────────────────────────────────────────────────────────────
+# box: 1.5                  # Bounding box loss weight
+# cls: 3.0                  # Classification loss weight (increased for 5 classes)
+# dfl: 1.0                  # Distribution focal loss weight
+#
+# ═══════════════════════════════════════════════════════════════════════════════
