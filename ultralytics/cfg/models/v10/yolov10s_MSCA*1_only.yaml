@@ -1,0 +1,78 @@
+# Ultralytics AGPL-3.0 License
+# YOLOv10s — MSCA Only (CBAM Removed) for SIPaKMeD cervical cell classification
+# Architecture decisions:
+#   - MSCA retained at P4 backbone exit only (multi-scale context for morphology)
+#   - MSCA @ P5 REMOVED (layer 10 in original)
+#   - CBAM2 REMOVED from neck FPN
+#   - PSA retained at top of backbone (global context before FPN)
+#   - v10Detect head: P3/P4/P5 with [128, 256, 512] channels
+nc: 5  # SIPaKMeD: Superficial, Intermediate, Dyskeratotic, Koilocytotic, Parabasal
+scale: s   
+scales:
+  # [depth, width, max_channels]
+  s: [0.33, 0.50, 1024]
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv,    [64, 3, 2]]            # 0 - P1/2
+  - [-1, 1, Conv,    [128, 3, 2]]           # 1 - P2/4
+  - [-1, 3, C2f,    [128, True]]            # 2
+  - [-1, 1, Conv,    [256, 3, 2]]           # 3 - P3/8
+  - [-1, 6, C2f,    [256, True]]            # 4 - P3 features (skip to neck)
+  - [-1, 1, SCDown,  [512, 3, 2]]           # 5 - P4/16
+  - [-1, 6, C2f,    [512, True]]            # 6
+  - [-1, 1, MSCA,   [512]]                  # 7 - Multi-Scale Context Attention @ P4 (KEPT)
+  - [-1, 1, SCDown,  [1024, 3, 2]]          # 8 - P5/32
+  - [-1, 3, C2fCIB, [1024, True, True]]     # 9
+  - [-1, 1, SPPF,   [1024, 5]]              # 10 - (was 11, MSCA@P5 removed)
+  - [-1, 1, PSA,    [1024]]                 # 11 - Global context (keep) (was 12)
+head:
+  # ── Top-down FPN ──────────────────────────────────────
+  - [-1,    1, nn.Upsample, [None, 2, "nearest"]]   # 12 (was 13)
+  - [[-1, 7], 1, Concat,    [1]]                    # 13 - cat backbone P4 after MSCA (was 14)
+  - [-1,    1, C2f,         [512, 1]]               # 14 - P4 neck features (was 15)
+  - [-1,    1, nn.Upsample, [None, 2, "nearest"]]   # 15 (was 16)
+  - [[-1, 4], 1, Concat,    [1]]                    # 16 - cat backbone P3 (was 17)
+  - [-1,    1, C2f,         [256, 1]]               # 17 - P3 neck features (was 18)
+  # ── Bottom-up PAN ──────────────────────────────────────
+  - [-1,    1, Conv,         [256, 3, 2]]           # 18 - downsample P3→P4 (was 19)
+  - [[-1, 14], 1, Concat,   [1]]                    # 19 - cat head P4 (was 20, ref updated 15→14)
+  - [-1,    1, C2f,         [512, 1]]               # 20 - P4 out (was 21)
+  - [-1,    1, SCDown,      [512, 3, 2]]            # 21 - downsample P4→P5 (was 22)
+  - [[-1, 11], 1, Concat,   [1]]                    # 22 - cat head P5 after PSA (was 23, ref updated 12→11)
+  - [-1,    1, C2fCIB,      [1024, True, True]]     # 23 - P5 out (was 24)
+  # ── Detection ──────────────────────────────────────────
+  - [[17, 20, 23], 1, v10Detect, [nc]]
+# ── Architecture Summary ────────────────────────────────
+# Total backbone layers: 12 (reduced by 1)
+# MSCA modules: 1 (kept at P4 only — layer 7)
+# CBAM2 modules: 0 (removed from neck)
+# PSA module: 1 (kept at backbone top)
+# Total head layers: 12
+#
+# Layer mapping from original (2x MSCA version):
+#   Layer 7  (MSCA @ P4)   → Layer 7  (KEPT)
+#   Layer 10 (MSCA @ P5)   → REMOVED
+#   Layer 11 (SPPF)        → Layer 10
+#   Layer 12 (PSA)         → Layer 11
+#   All subsequent layers  → shifted down by 1
+#
+# ── Recommended training config ────────────────────────
+# optimizer: AdamW
+# lr0: 0.0005
+# cos_lr: True
+# warmup_epochs: 3
+# epochs: 300
+# close_mosaic: 50        
+# label_smoothing: 0.15  
+#
+# Loss weights (MOST IMPORTANT lever):
+# cls: 3.0  
+# box: 1.5
+# dfl: 1.0
+#
+# Augmentation additions:
+# hsv_h: 0.02
+# hsv_s: 0.8
+# hsv_v: 0.5
+# copy_paste: 0.3 
+# mixup: 0.15
