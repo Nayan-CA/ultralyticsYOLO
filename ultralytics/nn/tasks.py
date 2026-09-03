@@ -11,6 +11,7 @@ import torch
 import torch.nn as nn
 
 from ultralytics.nn.autobackend import check_class_names
+from ultralytics.nn.modules.vim import HierVimBackbone, VimBlock
 from ultralytics.nn.modules import (
     AIFI,
     C1,
