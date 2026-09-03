@@ -201,4 +201,6 @@ __all__ = (
     "ConvNeXtBackbone",
     "C2f_CBAM",
     "MSCA",
+    "HierVimBackbone",
+    "VimBlock",
 )
