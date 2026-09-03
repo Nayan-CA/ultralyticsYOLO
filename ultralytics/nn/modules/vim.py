@@ -93,6 +93,9 @@ class VimBlock(nn.Module):
 
     def forward(self, x):
         residual = x
+        if not x.is_cuda:
+            return residual
+
         x = self.norm(x)
         y_fwd = self.mamba_fwd(x)
         y_bwd = self.mamba_bwd(x.flip(dims=[1])).flip(dims=[1])
