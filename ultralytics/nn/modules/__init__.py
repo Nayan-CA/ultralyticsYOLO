@@ -116,6 +116,11 @@ from .attention import (
     ECA,
 )
 
+from .vim import (
+    HierVimBackbone, 
+    VimBlock,
+)
+
 __all__ = (
     "AIFI",
     "C1",
