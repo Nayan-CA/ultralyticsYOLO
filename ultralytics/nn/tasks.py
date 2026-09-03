@@ -1687,7 +1687,19 @@ def parse_model(d, ch, verbose=True):
             if i == 0:
                 ch = []
             ch.append(c2)  # c2 is a list here, Index layers will pick from it
-            continue  # skip the generic m_ constructio
+            continue  # skip the generic m_ construction
+        elif m is HierVimBackbone:
+            # HierVimBackbone takes the full image and returns [P3, P4, P5]
+            # No args needed beyond defaults; ch stays as input channels
+            m_ = m(*args)
+            # Output channels for P3, P4, P5 based on dims config
+            # Default Hier-Vim-T: [192, 384, 768]
+            c2 = [192, 384, 768]
+            m_.i, m_.f, m_.type = i, f, t
+            save.extend(i for i in ([f] if isinstance(f, int) else f) if i != -1)
+            layers.append(m_)
+            ch.append(c2)  # list of output channels
+            continue
         else:
             c2 = ch[f]
 
