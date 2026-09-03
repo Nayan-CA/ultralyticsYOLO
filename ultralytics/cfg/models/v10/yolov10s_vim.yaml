@@ -1,41 +1,37 @@
 # YOLOv10s with Hier-Vim-T backbone
-
 nc: 80
 scales:
   s: [0.33, 0.50, 1024]
 
 backbone:
-  # HierVimBackbone outputs [P3(192ch), P4(384ch), P5(768ch)]
-  - [-1, 1, HierVimBackbone, []]  # 0 - outputs list [P3, P4, P5]
+  - [-1, 1, HierVimBackbone, []]  # 0 — outputs list [P3(192ch), P4(384ch), P5(768ch)]
 
 head:
-  # --- Adapt Vim channels to match YOLOv10 head expectations ---
-  # P5 channel reduction: 768 → 512
-  - [0, 1, Conv, [512, 1, 1]]          # 1 - reduce P5 channels
-  - [-1, 1, SPPF, [512, 5]]            # 2 - SPPF on P5
-  - [-1, 1, PSA, [512]]                # 3 - PSA on P5
+  # ── Extract individual maps from backbone list ──────────────────
+  - [0, 1, Index, [0]]             # 1 — P3 (192ch, stride 8)
+  - [0, 1, Index, [1]]             # 2 — P4 (384ch, stride 16)
+  - [0, 1, Index, [2]]             # 3 — P5 (768ch, stride 32)
 
-  # Upsample P5 → P4
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 4
-  # P4 channel reduction: 384 → 384 (already ok, optionally reduce)
-  - [0, 1, Conv, [384, 1, 1]]          # 5 - P4 from backbone
-  - [[-1, 4], 1, Concat, [1]]          # 6 - cat P4 + upsampled P5
-  - [-1, 3, C2f, [384]]                # 7
+  # ── Top-down path ───────────────────────────────────────────────
+  - [3, 1, Conv, [512, 1, 1]]      # 4 — reduce P5: 768→512
+  - [4, 1, SPPF, [512, 5]]         # 5
+  - [5, 1, PSA, [512]]             # 6
 
-  # Upsample → P3
-  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 8
-  # P3 channel reduction: 192 → 256
-  - [0, 1, Conv, [256, 1, 1]]          # 9 - P3 from backbone
-  - [[-1, 8], 1, Concat, [1]]          # 10 - cat P3 + upsampled P4
-  - [-1, 3, C2f, [256]]                # 11 (P3/8-small)
+  - [6, 1, nn.Upsample, [None, 2, "nearest"]]   # 7
+  - [[7, 2], 1, Concat, [1]]       # 8 — cat P4(384) + up-P5(512) = 896
+  - [8, 3, C2f, [384]]             # 9
 
-  # Downsample path
-  - [-1, 1, Conv, [256, 3, 2]]         # 12
-  - [[-1, 7], 1, Concat, [1]]          # 13 - cat with P4 features
-  - [-1, 3, C2f, [384]]                # 14 (P4/16-medium)
+  - [9, 1, nn.Upsample, [None, 2, "nearest"]]   # 10
+  - [[10, 1], 1, Concat, [1]]      # 11 — cat P3(192) + up-P4(384) = 576
+  - [11, 3, C2f, [256]]            # 12 (P3/8-small)
 
-  - [-1, 1, SCDown, [512, 3, 2]]       # 15
-  - [[-1, 3], 1, Concat, [1]]          # 16 - cat with P5 features
-  - [-1, 3, C2fCIB, [512, True, True]] # 17 (P5/32-large)
+  # ── Bottom-up path ──────────────────────────────────────────────
+  - [12, 1, Conv, [256, 3, 2]]     # 13
+  - [[13, 9], 1, Concat, [1]]      # 14 — cat P4 features
+  - [14, 3, C2f, [384]]            # 15 (P4/16-medium)
 
-  - [[11, 14, 17], 1, v10Detect, [nc]] # Detect(P3, P4, P5)
+  - [15, 1, SCDown, [512, 3, 2]]   # 16
+  - [[16, 6], 1, Concat, [1]]      # 17 — cat P5 features
+  - [17, 3, C2fCIB, [512, True, True]]  # 18 (P5/32-large)
+
+  - [[12, 15, 18], 1, v10Detect, [nc]]  # Detect(P3, P4, P5)
