@@ -11,7 +11,7 @@ import torch
 import torch.nn as nn
 
 from ultralytics.nn.autobackend import check_class_names
-from ultralytics.nn.modules.vim import HierVimBackbone, VimBlock
+# from ultralytics.nn.modules.vim import HierVimBackbone, VimBlock
 from ultralytics.nn.modules import (
     AIFI,
     C1,
@@ -1690,21 +1690,21 @@ def parse_model(d, ch, verbose=True):
             ch.append(c2)  # c2 is a list here, Index layers will pick from it
             continue  # skip the generic m_ construction
 
-        elif m is HierVimBackbone:
-            m_ = m(*args)
-            c2 = [192, 384, 768]
-            t = str(m)[8:-2].replace("__main__.", "")                         # ← assign t first
-            m_.np = sum(x.numel() for x in m_.parameters())
-            m_.i, m_.f, m_.type = i, f, t
-            if verbose:
-                LOGGER.info(f"{i:>3}{f!s:>20}{1:>3}{m_.np:10.0f}  {t:<45}{args!s:<30}")
-            save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)  # ← x not i
-            save.append(i)
-            layers.append(m_)
-            if i == 0:
-                ch = []
-            ch.append(c2)
-            continue
+        # elif m is HierVimBackbone:
+        #     m_ = m(*args)
+        #     c2 = [192, 384, 768]
+        #     t = str(m)[8:-2].replace("__main__.", "")                         # ← assign t first
+        #     m_.np = sum(x.numel() for x in m_.parameters())
+        #     m_.i, m_.f, m_.type = i, f, t
+        #     if verbose:
+        #         LOGGER.info(f"{i:>3}{f!s:>20}{1:>3}{m_.np:10.0f}  {t:<45}{args!s:<30}")
+        #     save.extend(x % i for x in ([f] if isinstance(f, int) else f) if x != -1)  # ← x not i
+        #     save.append(i)
+        #     layers.append(m_)
+        #     if i == 0:
+        #         ch = []
+        #     ch.append(c2)
+        #     continue
 
         else:
             c2 = ch[f]
